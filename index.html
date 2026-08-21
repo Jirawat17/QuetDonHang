@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; }
+    h2 { margin-top: 0; }
+    select, button { font-size: 16px; padding: 10px; width: 100%; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+    button { background: #2e7d32; color: white; border: none; cursor: pointer; }
+    button:disabled { background: #aaa; }
+    button.stop { background: #c62828; }
+    button.phu { background: #616161; }
+    #reader { width: 100%; max-width: 400px; margin: 0 auto 12px; }
+    .counter { display: flex; justify-content: space-between; margin: 12px 0; font-size: 16px; }
+    .box-ok { color: #2e7d32; font-weight: bold; }
+    .box-warn { color: #e65100; font-weight: bold; }
+    .box-err { color: #c62828; font-weight: bold; }
+    .list-item { padding: 8px; border-bottom: 1px solid #ddd; font-size: 14px; }
+    .list-item.ok { background: #e8f5e9; }
+    .list-item.warn { background: #fff3e0; }
+    .list-item.err { background: #ffebee; }
+    .group-title { font-weight: bold; margin-top: 16px; }
+    .hidden { display: none; }
+    .ack-btn { font-size: 13px; padding: 4px 10px; width: auto; margin: 6px 0 0; background: #616161; }
+  </style>
+</head>
+<body>
+
+  <!-- MÀN HÌNH 1: CHỌN KỊCH BẢN -->
+  <div id="manHinhChonKichBan">
+    <h2>Quét Hàng Loạt</h2>
+    <label>Chọn kịch bản:</label>
+    <select id="ddKichBan"></select>
+    <button id="btnBatDauQuet">Bắt đầu quét</button>
+  </div>
+
+  <!-- MÀN HÌNH 2: QUÉT -->
+  <div id="manHinhQuet" class="hidden">
+    <h2 id="tieuDeQuet"></h2>
+    <div class="counter">
+      <span class="box-ok">✅ <span id="demOk">0</span></span>
+      <span class="box-warn">⚠️ <span id="demWarn">0</span></span>
+      <span class="box-err">❌ <span id="demErr">0</span></span>
+    </div>
+    <div id="reader"></div>
+    <button class="stop" id="btnDungQuet">Dừng quét</button>
+  </div>
+
+  <!-- MÀN HÌNH 3: XEM LẠI -->
+  <div id="manHinhXemLai" class="hidden">
+    <h2>Xem lại trước khi xác nhận</h2>
+
+    <div class="group-title">✅ Sẵn sàng cập nhật (<span id="soLuongOk">0</span>)</div>
+    <div id="dsOk"></div>
+
+    <div class="group-title">⚠️ Sai trạng thái (<span id="soLuongWarn">0</span>) — cần xem, không tự cập nhật</div>
+    <div id="dsWarn"></div>
+
+    <div class="group-title">❌ Không tìm thấy (<span id="soLuongErr">0</span>) — cần xem, không tự cập nhật</div>
+    <div id="dsErr"></div>
+
+    <button id="btnXacNhan" disabled>Xác nhận cập nhật (<span id="soLuongXacNhan">0</span> đơn)</button>
+    <button class="phu" id="btnQuetTiep">Quét thêm</button>
+  </div>
+
+  <!-- MÀN HÌNH 4: HOÀN TẤT -->
+  <div id="manHinhHoanTat" class="hidden">
+    <h2>✅ Hoàn tất</h2>
+    <p id="ketQuaCuoi"></p>
+    <button id="btnQuetLai">Quét lô mới</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    // ============================================================
+    // DÁN URL WEB APP CỦA BẠN VÀO ĐÂY sau khi Deploy
+    // (Deploy > Manage deployments > copy link kết thúc bằng /exec)
+    // ============================================================
+    const API_URL = "https://script.google.com/macros/s/AKfycbxT6BzbyprS-hj3STNwUNTGCEMwK1HdicAFUAAHrLa9l4ochEnnn1Zm0mqiXX0SkecJ/exec";
+
+    function goiApiGet(action, params) {
+      params = params || {};
+      const qs = new URLSearchParams(Object.assign({ action: action }, params)).toString();
+      return fetch(API_URL + '?' + qs).then(r => r.json());
+    }
+
+    function goiApiPost(action, data) {
+      return fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({ action: action }, data))
+      }).then(r => r.json());
+    }
+
+    let danhSachKichBan = [];
+    let kichBanDangChon = null;
+    let html5QrCode = null;
+    let dangXuLyQuet = false; // chặn xử lý chồng khi đang chờ server trả lời
+
+    // Trạng thái các mã đã quét trong phiên hiện tại (dedupe theo STT_Key)
+    let ketQuaQuet = {}; // { stt_key: { ketQua, trangThaiHienTai, tenSanPham, daXacNhanXem } }
+
+    // ── Âm thanh phản hồi: OK = 1 tiếng cao, sai trạng thái = 2 tiếng trầm, không thấy = 1 tiếng dài trầm ──
+    function phatAm(loai) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const taoTieng = (tanSo, thoiLuong, doTre) => {
+        setTimeout(() => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.frequency.value = tanSo;
+          g.gain.value = 0.15;
+          o.start();
+          setTimeout(() => o.stop(), thoiLuong);
+        }, doTre);
+      };
+      if (loai === 'ok')   taoTieng(880, 120, 0);
+      if (loai === 'warn') { taoTieng(440, 100, 0); taoTieng(440, 100, 180); }
+      if (loai === 'err')  taoTieng(220, 350, 0);
+    }
+
+    // ── Khởi tạo: load danh sách kịch bản ────────────────────
+    goiApiGet('layDanhSachKichBan').then(function(ds) {
+      danhSachKichBan = ds;
+      const dd = document.getElementById('ddKichBan');
+      ds.forEach((kb, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = kb.ten + (kb.trangThaiYeuCau ? ' (yêu cầu: ' + kb.trangThaiYeuCau + ')' : '');
+        dd.appendChild(opt);
+      });
+    }).catch(function(err) {
+      alert('Không tải được danh sách kịch bản: ' + err.message);
+    });
+
+    document.getElementById('btnBatDauQuet').onclick = function() {
+      const idx = document.getElementById('ddKichBan').value;
+      kichBanDangChon = danhSachKichBan[idx];
+      ketQuaQuet = {};
+      document.getElementById('tieuDeQuet').textContent = 'Đang quét: ' + kichBanDangChon.ten;
+      document.getElementById('manHinhChonKichBan').classList.add('hidden');
+      document.getElementById('manHinhQuet').classList.remove('hidden');
+      batDauCamera();
+    };
+
+    function batDauCamera() {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        onQuetDuocMa,
+        () => {} // không quét được khung hình này - bỏ qua, không phải lỗi thật
+      );
+    }
+
+    function onQuetDuocMa(stt_key) {
+      if (dangXuLyQuet) return;
+      if (ketQuaQuet[stt_key]) return; // đã có trong phiên này rồi, bỏ qua không quét lại
+
+      dangXuLyQuet = true;
+      goiApiGet('kiemTraMaQuet', { stt_key: stt_key, trangThaiYeuCau: kichBanDangChon.trangThaiYeuCau })
+        .then(function(kq) {
+          kq.stt_key = stt_key;
+          kq.daXacNhanXem = false;
+          ketQuaQuet[stt_key] = kq;
+          capNhatBoDem();
+          if (kq.ketQua === 'OK') phatAm('ok');
+          else if (kq.ketQua === 'SAI_TRANG_THAI') phatAm('warn');
+          else phatAm('err');
+          dangXuLyQuet = false;
+        })
+        .catch(function(err) {
+          dangXuLyQuet = false;
+          console.error(err);
+        });
+    }
+
+    function capNhatBoDem() {
+      const vals = Object.values(ketQuaQuet);
+      document.getElementById('demOk').textContent = vals.filter(v => v.ketQua === 'OK').length;
+      document.getElementById('demWarn').textContent = vals.filter(v => v.ketQua === 'SAI_TRANG_THAI').length;
+      document.getElementById('demErr').textContent = vals.filter(v => v.ketQua === 'KHONG_TIM_THAY').length;
+    }
+
+    document.getElementById('btnDungQuet').onclick = function() {
+      html5QrCode.stop().then(() => {
+        document.getElementById('manHinhQuet').classList.add('hidden');
+        hienThiManHinhXemLai();
+      });
+    };
+
+    function hienThiManHinhXemLai() {
+      const vals = Object.values(ketQuaQuet);
+      const dsOk = vals.filter(v => v.ketQua === 'OK');
+      const dsWarn = vals.filter(v => v.ketQua === 'SAI_TRANG_THAI');
+      const dsErr = vals.filter(v => v.ketQua === 'KHONG_TIM_THAY');
+
+      renderNhom('dsOk', dsOk, 'ok', false);
+      renderNhom('dsWarn', dsWarn, 'warn', true);
+      renderNhom('dsErr', dsErr, 'err', true);
+
+      document.getElementById('soLuongOk').textContent = dsOk.length;
+      document.getElementById('soLuongWarn').textContent = dsWarn.length;
+      document.getElementById('soLuongErr').textContent = dsErr.length;
+      document.getElementById('soLuongXacNhan').textContent = dsOk.length;
+
+      capNhatNutXacNhan();
+      document.getElementById('manHinhXemLai').classList.remove('hidden');
+    }
+
+    function renderNhom(elId, ds, loai, canXacNhanXem) {
+      const el = document.getElementById(elId);
+      el.innerHTML = '';
+      if (ds.length === 0) { el.innerHTML = '<div class="list-item">(không có)</div>'; return; }
+
+      ds.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'list-item ' + loai;
+        let noiDung = '<b>' + item.stt_key + '</b>';
+        if (item.tenSanPham) noiDung += ' — ' + item.tenSanPham;
+        if (loai === 'warn') noiDung += '<br>Hiện đang ở "' + item.trangThaiHienTai + '", kịch bản yêu cầu "' + kichBanDangChon.trangThaiYeuCau + '"';
+        if (loai === 'err') noiDung += '<br>Không khớp với STT_Key nào trong Sheet';
+        div.innerHTML = noiDung;
+
+        if (canXacNhanXem) {
+          const btn = document.createElement('button');
+          btn.className = 'ack-btn';
+          btn.textContent = 'Đã xem';
+          btn.onclick = function() {
+            ketQuaQuet[item.stt_key].daXacNhanXem = true;
+            div.style.opacity = '0.5';
+            btn.disabled = true;
+            btn.textContent = '✓ Đã xem';
+            capNhatNutXacNhan();
+          };
+          div.appendChild(btn);
+        }
+        el.appendChild(div);
+      });
+    }
+
+    function capNhatNutXacNhan() {
+      const vals = Object.values(ketQuaQuet);
+      const canXacNhanXem = vals.filter(v => v.ketQua !== 'OK');
+      const conChuaXem = canXacNhanXem.some(v => !v.daXacNhanXem);
+      document.getElementById('btnXacNhan').disabled = conChuaXem || vals.filter(v => v.ketQua === 'OK').length === 0;
+    }
+
+    document.getElementById('btnXacNhan').onclick = function() {
+      const btn = document.getElementById('btnXacNhan');
+      btn.disabled = true;
+      btn.textContent = 'Đang cập nhật...';
+
+      const dsOk = Object.values(ketQuaQuet)
+        .filter(v => v.ketQua === 'OK')
+        .map(v => ({ stt_key: v.stt_key, trangThaiCu: v.trangThaiHienTai, tenSanPham: v.tenSanPham }));
+
+      const dsLoi = Object.values(ketQuaQuet)
+        .filter(v => v.ketQua !== 'OK')
+        .map(v => ({ stt_key: v.stt_key, trangThaiHienTai: v.trangThaiHienTai, ketQua: v.ketQua }));
+
+      goiApiPost('xacNhanCapNhatHangLoat', {
+        tenKichBan: kichBanDangChon.ten,
+        trangThaiSau: kichBanDangChon.trangThaiSau,
+        danhSach: dsOk
+      }).then(function(kq) {
+        if (dsLoi.length > 0) {
+          goiApiPost('ghiLogLoiQuet', { tenKichBan: kichBanDangChon.ten, danhSachLoi: dsLoi });
+        }
+        document.getElementById('manHinhXemLai').classList.add('hidden');
+        document.getElementById('ketQuaCuoi').textContent =
+          'Đã cập nhật ' + kq.thanhCong.length + ' đơn sang "' + kichBanDangChon.trangThaiSau + '".' +
+          (kq.thatBai.length > 0 ? ' (' + kq.thatBai.length + ' đơn lỗi khi ghi, xem tab NhatKyQuetHangLoat)' : '');
+        document.getElementById('manHinhHoanTat').classList.remove('hidden');
+      }).catch(function(err) {
+        alert('Lỗi khi cập nhật: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Xác nhận cập nhật';
+      });
+    };
+
+    document.getElementById('btnQuetTiep').onclick = function() {
+      document.getElementById('manHinhXemLai').classList.add('hidden');
+      document.getElementById('manHinhQuet').classList.remove('hidden');
+      batDauCamera();
+    };
+
+    document.getElementById('btnQuetLai').onclick = function() {
+      location.reload();
+    };
+  </script>
+</body>
+</html>
