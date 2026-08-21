@@ -22,6 +22,12 @@
     .group-title { font-weight: bold; margin-top: 16px; }
     .hidden { display: none; }
     .ack-btn { font-size: 13px; padding: 4px 10px; width: auto; margin: 6px 0 0; background: #616161; }
+    .thong-bao-quet { text-align: center; font-size: 15px; font-weight: bold; padding: 10px; border-radius: 8px; min-height: 20px; background: #e0e0e0; }
+    .thong-bao-quet.ok { background: #e8f5e9; color: #2e7d32; }
+    .thong-bao-quet.warn { background: #fff3e0; color: #e65100; }
+    .thong-bao-quet.err { background: #ffebee; color: #c62828; }
+    #lyDoChuaXacNhan { color: #c62828; font-size: 14px; text-align: center; margin: -6px 0 12px; }
+    .ack-all-btn { background: #e65100; margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -43,6 +49,7 @@
       <span class="box-err">❌ <span id="demErr">0</span></span>
     </div>
     <div id="reader"></div>
+    <div id="thongBaoQuet" class="thong-bao-quet"></div>
     <button class="stop" id="btnDungQuet">Dừng quét</button>
   </div>
 
@@ -59,6 +66,8 @@
     <div class="group-title">❌ Không tìm thấy (<span id="soLuongErr">0</span>) — cần xem, không tự cập nhật</div>
     <div id="dsErr"></div>
 
+    <button class="ack-all-btn hidden" id="btnDaXemTatCa">Đã xem tất cả mục ⚠️/❌</button>
+    <p id="lyDoChuaXacNhan" class="hidden"></p>
     <button id="btnXacNhan" disabled>Xác nhận cập nhật (<span id="soLuongXacNhan">0</span> đơn)</button>
     <button class="phu" id="btnQuetTiep">Quét thêm</button>
   </div>
@@ -76,12 +85,25 @@
     // DÁN URL WEB APP CỦA BẠN VÀO ĐÂY sau khi Deploy
     // (Deploy > Manage deployments > copy link kết thúc bằng /exec)
     // ============================================================
-    const API_URL = "https://script.google.com/macros/s/AKfycbwjR_Pk7qsq0Q5BuBTOyA0A3p1PyFm4btsRBHgxfZXSuCMIXSVNE8QFVLUYGebkppIq/exec";
+    const API_URL = ""https://script.google.com/macros/s/AKfycbwjR_Pk7qsq0Q5BuBTOyA0A3p1PyFm4btsRBHgxfZXSuCMIXSVNE8QFVLUYGebkppIq/exec";
 
     function goiApiGet(action, params) {
       params = params || {};
       const qs = new URLSearchParams(Object.assign({ action: action }, params)).toString();
-      return fetch(API_URL + '?' + qs).then(r => r.json());
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // huỷ nếu quá 15 giây không phản hồi
+
+      return fetch(API_URL + '?' + qs, { signal: controller.signal })
+        .then(r => {
+          clearTimeout(timeoutId);
+          if (!r.ok) throw new Error('Server trả lỗi HTTP ' + r.status);
+          return r.json();
+        })
+        .catch(err => {
+          clearTimeout(timeoutId);
+          if (err.name === 'AbortError') throw new Error('Mạng chậm, quá 15 giây chưa phản hồi. Thử lại.');
+          throw err;
+        });
     }
 
     let danhSachKichBan = [];
@@ -150,21 +172,30 @@
       if (ketQuaQuet[stt_key]) return; // đã có trong phiên này rồi, bỏ qua không quét lại
 
       dangXuLyQuet = true;
+      hienThongBaoQuet('Đang kiểm tra ' + stt_key + '...', '');
       goiApiGet('kiemTraMaQuet', { stt_key: stt_key, trangThaiYeuCau: kichBanDangChon.trangThaiYeuCau })
         .then(function(kq) {
           kq.stt_key = stt_key;
           kq.daXacNhanXem = false;
           ketQuaQuet[stt_key] = kq;
           capNhatBoDem();
-          if (kq.ketQua === 'OK') phatAm('ok');
-          else if (kq.ketQua === 'SAI_TRANG_THAI') phatAm('warn');
-          else phatAm('err');
+          if (kq.ketQua === 'OK') { phatAm('ok'); hienThongBaoQuet('✅ ' + stt_key + ' — OK', 'ok'); }
+          else if (kq.ketQua === 'SAI_TRANG_THAI') { phatAm('warn'); hienThongBaoQuet('⚠️ ' + stt_key + ' — sai trạng thái', 'warn'); }
+          else { phatAm('err'); hienThongBaoQuet('❌ ' + stt_key + ' — không tìm thấy', 'err'); }
           dangXuLyQuet = false;
         })
         .catch(function(err) {
           dangXuLyQuet = false;
+          phatAm('err');
+          hienThongBaoQuet('❌ Lỗi mạng khi kiểm tra ' + stt_key + ' — quét lại mã này', 'err');
           console.error(err);
         });
+    }
+
+    function hienThongBaoQuet(text, loai) {
+      const el = document.getElementById('thongBaoQuet');
+      el.textContent = text;
+      el.className = 'thong-bao-quet ' + loai;
     }
 
     function capNhatBoDem() {
@@ -234,9 +265,31 @@
     function capNhatNutXacNhan() {
       const vals = Object.values(ketQuaQuet);
       const canXacNhanXem = vals.filter(v => v.ketQua !== 'OK');
-      const conChuaXem = canXacNhanXem.some(v => !v.daXacNhanXem);
-      document.getElementById('btnXacNhan').disabled = conChuaXem || vals.filter(v => v.ketQua === 'OK').length === 0;
+      const soChuaXem = canXacNhanXem.filter(v => !v.daXacNhanXem).length;
+      const soOk = vals.filter(v => v.ketQua === 'OK').length;
+
+      document.getElementById('btnXacNhan').disabled = soChuaXem > 0 || soOk === 0;
+
+      const lyDo = document.getElementById('lyDoChuaXacNhan');
+      const btnDaXemTatCa = document.getElementById('btnDaXemTatCa');
+      if (soChuaXem > 0) {
+        lyDo.textContent = '⚠️ Còn ' + soChuaXem + ' mục ⚠️/❌ chưa bấm "Đã xem" — phải xem hết mới xác nhận được.';
+        lyDo.classList.remove('hidden');
+        btnDaXemTatCa.classList.remove('hidden');
+      } else if (soOk === 0) {
+        lyDo.textContent = 'Không có mã nào ở nhóm ✅ để cập nhật.';
+        lyDo.classList.remove('hidden');
+        btnDaXemTatCa.classList.add('hidden');
+      } else {
+        lyDo.classList.add('hidden');
+        btnDaXemTatCa.classList.add('hidden');
+      }
     }
+
+    document.getElementById('btnDaXemTatCa').onclick = function() {
+      Object.values(ketQuaQuet).forEach(v => { if (v.ketQua !== 'OK') v.daXacNhanXem = true; });
+      hienThiManHinhXemLai(); // vẽ lại toàn bộ danh sách để cập nhật giao diện các nút "Đã xem"
+    };
 
     document.getElementById('btnXacNhan').onclick = function() {
       const btn = document.getElementById('btnXacNhan');
@@ -256,18 +309,22 @@
         trangThaiSau: kichBanDangChon.trangThaiSau,
         danhSach: JSON.stringify(dsOk)
       }).then(function(kq) {
+        if (!kq || !Array.isArray(kq.thanhCong)) {
+          throw new Error(kq && kq.loi ? kq.loi : 'Server trả về dữ liệu không đúng định dạng.');
+        }
         if (dsLoi.length > 0) {
-          goiApiGet('ghiLogLoiQuet', { tenKichBan: kichBanDangChon.ten, danhSachLoi: JSON.stringify(dsLoi) });
+          goiApiGet('ghiLogLoiQuet', { tenKichBan: kichBanDangChon.ten, danhSachLoi: JSON.stringify(dsLoi) })
+            .catch(err => console.error('Ghi log lỗi thất bại (không ảnh hưởng kết quả chính):', err));
         }
         document.getElementById('manHinhXemLai').classList.add('hidden');
         document.getElementById('ketQuaCuoi').textContent =
           'Đã cập nhật ' + kq.thanhCong.length + ' đơn sang "' + kichBanDangChon.trangThaiSau + '".' +
-          (kq.thatBai.length > 0 ? ' (' + kq.thatBai.length + ' đơn lỗi khi ghi, xem tab NhatKyQuetHangLoat)' : '');
+          (kq.thatBai && kq.thatBai.length > 0 ? ' (' + kq.thatBai.length + ' đơn lỗi khi ghi, xem tab NhatKyQuetHangLoat)' : '');
         document.getElementById('manHinhHoanTat').classList.remove('hidden');
       }).catch(function(err) {
-        alert('Lỗi khi cập nhật: ' + err.message);
+        alert('Lỗi khi cập nhật: ' + err.message + '\n\nDữ liệu chưa mất, bấm "Xác nhận cập nhật" để thử lại.');
         btn.disabled = false;
-        btn.textContent = 'Xác nhận cập nhật';
+        btn.textContent = 'Xác nhận cập nhật (' + dsOk.length + ' đơn)';
       });
     };
 
