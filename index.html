@@ -3,32 +3,55 @@
 <head>
   <base target="_top">
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; }
-    h2 { margin-top: 0; }
-    select, button { font-size: 16px; padding: 10px; width: 100%; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; font-size: 18px; }
+    h2 { margin-top: 0; font-size: 22px; }
+    select, button { font-size: 18px; padding: 12px; width: 100%; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
     button { background: #2e7d32; color: white; border: none; cursor: pointer; }
     button:disabled { background: #aaa; }
-    button.stop { background: #c62828; }
+    button.stop { background: #c62828; font-size: 20px; padding: 16px; }
     button.phu { background: #616161; }
     #manHinhQuet { margin: -16px; padding: 16px; }
-    #reader { width: 100%; margin: 0 auto 12px; }
+    #reader { width: 100%; margin: 0 auto 10px; }
     #reader video { border-radius: 8px; }
-    .counter { display: flex; justify-content: space-between; margin: 12px 0; font-size: 16px; }
-    .box-ok { color: #2e7d32; font-weight: bold; }
-    .box-warn { color: #e65100; font-weight: bold; }
-    .box-err { color: #c62828; font-weight: bold; }
-    .list-item { padding: 8px; border-bottom: 1px solid #ddd; font-size: 14px; }
+
+    .quet-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .quet-header h2 { flex: 1; margin: 0; }
+    .flash-btn { width: 52px; height: 52px; flex: none; font-size: 24px; padding: 0; margin: 0; background: #424242; border-radius: 50%; }
+    .flash-btn.dang-bat { background: #f9a825; }
+
+    .counter-lon { display: flex; justify-content: space-between; margin: 10px 0; gap: 8px; }
+    .counter-lon > div { flex: 1; text-align: center; border-radius: 10px; padding: 10px 4px; }
+    .counter-lon .icon { font-size: 30px; display: block; }
+    .counter-lon .so { font-size: 28px; font-weight: bold; display: block; }
+    .box-ok { background: #e8f5e9; color: #2e7d32; }
+    .box-warn { background: #fff3e0; color: #e65100; }
+    .box-err { background: #ffebee; color: #c62828; }
+
+    .card-vua-quet { text-align: center; padding: 14px 10px; border-radius: 10px; margin-bottom: 10px; transition: opacity 0.6s ease; font-size: 20px; font-weight: bold; }
+    .card-vua-quet .ten-sp { display: block; font-size: 16px; font-weight: normal; margin-top: 4px; }
+    .card-vua-quet.mo-dan { opacity: 0.35; }
+    .card-vua-quet.ok { background: #c8e6c9; color: #1b5e20; }
+    .card-vua-quet.warn { background: #ffe0b2; color: #e65100; }
+    .card-vua-quet.err { background: #ffcdd2; color: #b71c1c; }
+
+    .danh-sach-dang-quet { max-height: 32vh; overflow-y: auto; border-radius: 8px; margin-bottom: 10px; }
+    .dong-quet { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ddd; font-size: 16px; }
+    .dong-quet.ok { background: #e8f5e9; }
+    .dong-quet.warn { background: #fff3e0; }
+    .dong-quet.err { background: #ffebee; }
+    .dong-quet .noi-dung { flex: 1; }
+    .dong-quet .noi-dung b { font-size: 17px; }
+    .btn-xoa-dong { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #757575; color: white; border: none; font-size: 16px; margin: 0 0 0 8px; padding: 0; }
+
+    .counter { display: flex; justify-content: space-between; margin: 12px 0; font-size: 18px; }
+    .list-item { padding: 10px; border-bottom: 1px solid #ddd; font-size: 16px; }
     .list-item.ok { background: #e8f5e9; }
     .list-item.warn { background: #fff3e0; }
     .list-item.err { background: #ffebee; }
-    .group-title { font-weight: bold; margin-top: 16px; }
+    .group-title { font-weight: bold; margin-top: 16px; font-size: 18px; }
     .hidden { display: none; }
-    .ack-btn { font-size: 13px; padding: 4px 10px; width: auto; margin: 6px 0 0; background: #616161; }
-    .thong-bao-quet { text-align: center; font-size: 15px; font-weight: bold; padding: 10px; border-radius: 8px; min-height: 20px; background: #e0e0e0; }
-    .thong-bao-quet.ok { background: #e8f5e9; color: #2e7d32; }
-    .thong-bao-quet.warn { background: #fff3e0; color: #e65100; }
-    .thong-bao-quet.err { background: #ffebee; color: #c62828; }
-    #lyDoChuaXacNhan { color: #c62828; font-size: 14px; text-align: center; margin: -6px 0 12px; }
+    .ack-btn { font-size: 15px; padding: 6px 12px; width: auto; margin: 6px 0 0; background: #616161; }
+    #lyDoChuaXacNhan { color: #c62828; font-size: 16px; text-align: center; margin: -6px 0 12px; }
     .ack-all-btn { background: #e65100; margin-bottom: 8px; }
   </style>
 </head>
@@ -44,14 +67,18 @@
 
   <!-- MÀN HÌNH 2: QUÉT -->
   <div id="manHinhQuet" class="hidden">
-    <h2 id="tieuDeQuet"></h2>
-    <div class="counter">
-      <span class="box-ok">✅ <span id="demOk">0</span></span>
-      <span class="box-warn">⚠️ <span id="demWarn">0</span></span>
-      <span class="box-err">❌ <span id="demErr">0</span></span>
+    <div class="quet-header">
+      <h2 id="tieuDeQuet"></h2>
+      <button id="btnFlash" class="flash-btn" title="Bật/tắt đèn pin">🔦</button>
+    </div>
+    <div class="counter-lon">
+      <div class="box-ok"><span class="icon">✅</span><span class="so" id="demOk">0</span></div>
+      <div class="box-warn"><span class="icon">⚠️</span><span class="so" id="demWarn">0</span></div>
+      <div class="box-err"><span class="icon">❌</span><span class="so" id="demErr">0</span></div>
     </div>
     <div id="reader"></div>
-    <div id="thongBaoQuet" class="thong-bao-quet"></div>
+    <div id="cardVuaQuet" class="card-vua-quet hidden"></div>
+    <div id="danhSachDangQuet" class="danh-sach-dang-quet"></div>
     <button class="stop" id="btnDungQuet">Dừng quét</button>
   </div>
 
@@ -115,6 +142,8 @@
 
     // Trạng thái các mã đã quét trong phiên hiện tại (dedupe theo STT_Key)
     let ketQuaQuet = {}; // { stt_key: { ketQua, trangThaiHienTai, tenSanPham, daXacNhanXem } }
+    let thuTuQuet = []; // mảng stt_key theo thứ tự quét, mới nhất ở đầu — dùng để hiển thị danh sách đúng thứ tự
+    let dangBatDenPin = false;
 
     // ── Âm thanh phản hồi: OK = 1 tiếng cao, sai trạng thái = 2 tiếng trầm, không thấy = 1 tiếng dài trầm ──
     function phatAm(loai) {
@@ -135,6 +164,12 @@
       if (loai === 'err')  taoTieng(220, 350, 0);
     }
 
+    // ── Rung phản hồi: chỉ rung dài khi KHÔNG tìm thấy mã (cảnh báo cần chú ý nhất) ──
+    function rungPhanHoi(loai) {
+      if (!navigator.vibrate) return;
+      if (loai === 'err') navigator.vibrate(500);
+    }
+
     // ── Khởi tạo: load danh sách kịch bản ────────────────────
     goiApiGet('layDanhSachKichBan').then(function(ds) {
       danhSachKichBan = ds;
@@ -153,20 +188,24 @@
       const idx = document.getElementById('ddKichBan').value;
       kichBanDangChon = danhSachKichBan[idx];
       ketQuaQuet = {};
+      thuTuQuet = [];
+      dangBatDenPin = false;
       document.getElementById('tieuDeQuet').textContent = 'Đang quét: ' + kichBanDangChon.ten;
       document.getElementById('manHinhChonKichBan').classList.add('hidden');
       document.getElementById('manHinhQuet').classList.remove('hidden');
+      document.getElementById('danhSachDangQuet').innerHTML = '';
+      document.getElementById('cardVuaQuet').className = 'card-vua-quet hidden';
       batDauCamera();
     };
 
     function batDauCamera() {
       html5QrCode = new Html5Qrcode("reader");
 
-      // Khung quét = 80% cạnh ngắn hơn của khung hình thực tế, thay vì cố định 250px —
-      // giúp khung quét lớn hơn đáng kể khi màn hình rộng (đặc biệt ở chế độ dọc).
+      // Khung quét = 60% cạnh ngắn hơn của khung hình thực tế (giảm từ 80% để
+      // nhường chỗ hiển thị danh sách kết quả bên dưới).
       const tinhKichThuocQrbox = (viewfinderWidth, viewfinderHeight) => {
         const canhNgan = Math.min(viewfinderWidth, viewfinderHeight);
-        const kichThuoc = Math.floor(canhNgan * 0.8);
+        const kichThuoc = Math.floor(canhNgan * 0.6);
         return { width: kichThuoc, height: kichThuoc };
       };
 
@@ -186,35 +225,106 @@
       );
     }
 
+    // ── Đèn pin: chỉ hoạt động trên các trình duyệt/thiết bị hỗ trợ (chủ yếu Android Chrome).
+    // Safari trên iPhone hiện KHÔNG hỗ trợ điều khiển đèn pin qua web — nếu bấm không có
+    // tác dụng trên iPhone, dùng đèn pin có sẵn trong Trung tâm điều khiển của máy thay thế.
+    document.getElementById('btnFlash').onclick = function() {
+      if (!html5QrCode) return;
+      dangBatDenPin = !dangBatDenPin;
+      html5QrCode.applyVideoConstraints({ advanced: [{ torch: dangBatDenPin }] })
+        .then(() => {
+          document.getElementById('btnFlash').classList.toggle('dang-bat', dangBatDenPin);
+        })
+        .catch(() => {
+          dangBatDenPin = !dangBatDenPin; // đảo lại vì không áp dụng được
+          alert('Thiết bị này không hỗ trợ bật đèn pin qua trình duyệt. Dùng đèn pin có sẵn của điện thoại thay thế.');
+        });
+    };
+
     function onQuetDuocMa(stt_key) {
       if (dangXuLyQuet) return;
       if (ketQuaQuet[stt_key]) return; // đã có trong phiên này rồi, bỏ qua không quét lại
 
       dangXuLyQuet = true;
-      hienThongBaoQuet('Đang kiểm tra ' + stt_key + '...', '');
+      hienThiCardVuaQuet('Đang kiểm tra ' + stt_key + '...', '');
       goiApiGet('kiemTraMaQuet', { stt_key: stt_key, trangThaiYeuCau: kichBanDangChon.trangThaiYeuCau })
         .then(function(kq) {
           kq.stt_key = stt_key;
           kq.daXacNhanXem = false;
           ketQuaQuet[stt_key] = kq;
+          thuTuQuet.unshift(stt_key);
           capNhatBoDem();
-          if (kq.ketQua === 'OK') { phatAm('ok'); hienThongBaoQuet('✅ ' + stt_key + ' — OK', 'ok'); }
-          else if (kq.ketQua === 'SAI_TRANG_THAI') { phatAm('warn'); hienThongBaoQuet('⚠️ ' + stt_key + ' — sai trạng thái', 'warn'); }
-          else { phatAm('err'); hienThongBaoQuet('❌ ' + stt_key + ' — không tìm thấy', 'err'); }
+          renderDanhSachDangQuet();
+
+          if (kq.ketQua === 'OK') {
+            phatAm('ok');
+            hienThiCardVuaQuet('✅ ' + stt_key + ' — OK', 'ok', kq.tenSanPham);
+          } else if (kq.ketQua === 'SAI_TRANG_THAI') {
+            phatAm('warn');
+            hienThiCardVuaQuet('⚠️ ' + stt_key + ' — sai trạng thái', 'warn', kq.tenSanPham);
+          } else {
+            phatAm('err');
+            rungPhanHoi('err');
+            hienThiCardVuaQuet('❌ ' + stt_key + ' — không tìm thấy', 'err');
+          }
           dangXuLyQuet = false;
         })
         .catch(function(err) {
           dangXuLyQuet = false;
           phatAm('err');
-          hienThongBaoQuet('❌ Lỗi mạng khi kiểm tra ' + stt_key + ' — quét lại mã này', 'err');
+          rungPhanHoi('err');
+          hienThiCardVuaQuet('❌ Lỗi mạng khi kiểm tra ' + stt_key + ' — quét lại mã này', 'err');
           console.error(err);
         });
     }
 
-    function hienThongBaoQuet(text, loai) {
-      const el = document.getElementById('thongBaoQuet');
-      el.textContent = text;
-      el.className = 'thong-bao-quet ' + loai;
+    // ── Card "vừa quét": hiện to, nổi bật ngay dưới camera, mờ dần sau 3.5 giây ──
+    let hienThiCardVuaQuetTimeout = null;
+    function hienThiCardVuaQuet(text, loai, tenSanPham) {
+      const el = document.getElementById('cardVuaQuet');
+      el.innerHTML = text + (tenSanPham ? '<span class="ten-sp">' + tenSanPham + '</span>' : '');
+      el.className = 'card-vua-quet ' + loai;
+
+      clearTimeout(hienThiCardVuaQuetTimeout);
+      hienThiCardVuaQuetTimeout = setTimeout(() => {
+        el.classList.add('mo-dan');
+      }, 3500);
+    }
+
+    // ── Danh sách đang quét: mới nhất ở trên, xoá được ngay nếu quét nhầm ──
+    function renderDanhSachDangQuet() {
+      const el = document.getElementById('danhSachDangQuet');
+      el.innerHTML = '';
+
+      thuTuQuet.forEach(stt_key => {
+        const kq = ketQuaQuet[stt_key];
+        if (!kq) return;
+
+        const loai = kq.ketQua === 'OK' ? 'ok' : (kq.ketQua === 'SAI_TRANG_THAI' ? 'warn' : 'err');
+        const nhan = kq.ketQua === 'OK' ? 'OK' : (kq.ketQua === 'SAI_TRANG_THAI' ? 'Sai trạng thái' : 'Không tìm thấy');
+
+        const dong = document.createElement('div');
+        dong.className = 'dong-quet ' + loai;
+
+        const noiDung = document.createElement('div');
+        noiDung.className = 'noi-dung';
+        noiDung.innerHTML = '<b>' + stt_key + '</b> — ' + nhan + (kq.tenSanPham ? ' — ' + kq.tenSanPham : '');
+        dong.appendChild(noiDung);
+
+        const btnXoa = document.createElement('button');
+        btnXoa.className = 'btn-xoa-dong';
+        btnXoa.textContent = '✕';
+        btnXoa.title = 'Xoá mã quét nhầm này';
+        btnXoa.onclick = function() {
+          delete ketQuaQuet[stt_key];
+          thuTuQuet = thuTuQuet.filter(k => k !== stt_key);
+          capNhatBoDem();
+          renderDanhSachDangQuet();
+        };
+        dong.appendChild(btnXoa);
+
+        el.appendChild(dong);
+      });
     }
 
     function capNhatBoDem() {
@@ -350,6 +460,8 @@
     document.getElementById('btnQuetTiep').onclick = function() {
       document.getElementById('manHinhXemLai').classList.add('hidden');
       document.getElementById('manHinhQuet').classList.remove('hidden');
+      dangBatDenPin = false;
+      document.getElementById('btnFlash').classList.remove('dang-bat');
       batDauCamera();
     };
 
