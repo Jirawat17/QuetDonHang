@@ -10,7 +10,9 @@
     button:disabled { background: #aaa; }
     button.stop { background: #c62828; }
     button.phu { background: #616161; }
-    #reader { width: 100%; max-width: 400px; margin: 0 auto 12px; }
+    #manHinhQuet { margin: -16px; padding: 16px; }
+    #reader { width: 100%; margin: 0 auto 12px; }
+    #reader video { border-radius: 8px; }
     .counter { display: flex; justify-content: space-between; margin: 12px 0; font-size: 16px; }
     .box-ok { color: #2e7d32; font-weight: bold; }
     .box-warn { color: #e65100; font-weight: bold; }
@@ -85,7 +87,7 @@
     // DÁN URL WEB APP CỦA BẠN VÀO ĐÂY sau khi Deploy
     // (Deploy > Manage deployments > copy link kết thúc bằng /exec)
     // ============================================================
-    const API_URL = ""https://script.google.com/macros/s/AKfycbwjR_Pk7qsq0Q5BuBTOyA0A3p1PyFm4btsRBHgxfZXSuCMIXSVNE8QFVLUYGebkppIq/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwjR_Pk7qsq0Q5BuBTOyA0A3p1PyFm4btsRBHgxfZXSuCMIXSVNE8QFVLUYGebkppIq/exec";
 
     function goiApiGet(action, params) {
       params = params || {};
@@ -159,9 +161,26 @@
 
     function batDauCamera() {
       html5QrCode = new Html5Qrcode("reader");
+
+      // Khung quét = 80% cạnh ngắn hơn của khung hình thực tế, thay vì cố định 250px —
+      // giúp khung quét lớn hơn đáng kể khi màn hình rộng (đặc biệt ở chế độ dọc).
+      const tinhKichThuocQrbox = (viewfinderWidth, viewfinderHeight) => {
+        const canhNgan = Math.min(viewfinderWidth, viewfinderHeight);
+        const kichThuoc = Math.floor(canhNgan * 0.8);
+        return { width: kichThuoc, height: kichThuoc };
+      };
+
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
+        {
+          fps: 10,
+          qrbox: tinhKichThuocQrbox,
+          videoConstraints: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        },
         onQuetDuocMa,
         () => {} // không quét được khung hình này - bỏ qua, không phải lỗi thật
       );
